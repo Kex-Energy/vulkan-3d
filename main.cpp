@@ -1,0 +1,3313 @@
+// модулятор логических схем
+// программа предназначена для изучения логических схем
+// Чернышев Д.А. А-07-18
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/hash.hpp>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
+#include <iostream>
+#include <fstream>
+#include <stdexcept>
+#include <algorithm>
+#include <chrono>
+#include <vector>
+#include <cstring>
+#include <cstdlib>
+#include <cstdint>
+#include <array>
+#include <optional>
+#include <set>
+#include <unordered_map>
+
+const uint32_t WIDTH = 800;
+const uint32_t HEIGHT = 600;
+
+const float PI = 3.14159265359;
+
+const std::string MODEL_PATH = "models/invertor.obj";
+const std::string TEXTURE_PATH = "textures/test.png";
+
+const int MAX_FRAMES_IN_FLIGHT = 2;
+
+const std::vector<const char*> validationLayers = {
+    "VK_LAYER_KHRONOS_validation"
+};
+
+const std::vector<const char*> deviceExtensions = {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
+
+float camerax = 0.0f, cameray = 0.0f, cameraz = 0.0f;
+bool go = false;
+bool go1 = false;
+bool go2 = false;
+bool go3 = false;
+bool enter_button = false;
+bool r_button = false;
+bool delete_button = false;
+int selected_item = 0;
+void keyboard(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_RIGHT_SHIFT && ((action == GLFW_REPEAT)||(action == GLFW_PRESS)))
+    {
+        cameraz += 0.1f;
+    }
+    if (key == GLFW_KEY_RIGHT_CONTROL && ((action == GLFW_REPEAT) || (action == GLFW_PRESS)))
+    {
+        cameraz -= 0.1f;
+    }
+    if (key == GLFW_KEY_UP && ((action == GLFW_REPEAT) || (action == GLFW_PRESS)))
+    {
+        cameray += 0.1f;
+    }
+    if (key == GLFW_KEY_DOWN && ((action == GLFW_REPEAT) || (action == GLFW_PRESS)))
+    {
+        cameray -= 0.1f;
+    }
+    if (key == GLFW_KEY_RIGHT && ((action == GLFW_REPEAT) || (action == GLFW_PRESS)))
+    {
+        camerax += 0.1f;
+    }
+    if (key == GLFW_KEY_LEFT && ((action == GLFW_REPEAT) || (action == GLFW_PRESS)))
+    {
+        camerax -= 0.1f;
+    }
+    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+    {
+        go = true;
+    }
+    if (key == GLFW_KEY_F1 && action == GLFW_PRESS)
+    {
+        go1 = true;
+    }
+    if (key == GLFW_KEY_F2 && action == GLFW_PRESS)
+    {
+        go2 = true;
+    }
+    if (key == GLFW_KEY_F3 && action == GLFW_PRESS)
+    {
+        go3 = true;
+    }
+    if (key == GLFW_KEY_ENTER && action == GLFW_PRESS)
+    {
+        enter_button = true;
+    }
+    if (key == GLFW_KEY_R && action == GLFW_PRESS)
+    {
+        r_button = true;
+    }
+    if (key == GLFW_KEY_0 && action == GLFW_PRESS)
+    {
+        selected_item = 0;
+    }
+    if (key == GLFW_KEY_1 && action == GLFW_PRESS)
+    {
+        selected_item = 1;
+    }
+    if (key == GLFW_KEY_2 && action == GLFW_PRESS)
+    {
+        selected_item = 2;
+    }
+    if (key == GLFW_KEY_3 && action == GLFW_PRESS)
+    {
+        selected_item = 3;
+    }
+    if (key == GLFW_KEY_4 && action == GLFW_PRESS)
+    {
+        selected_item = 4;
+    }
+    if (key == GLFW_KEY_5 && action == GLFW_PRESS)
+    {
+        selected_item = 5;
+    }
+    if (key == GLFW_KEY_6 && action == GLFW_PRESS)
+    {
+        selected_item = 6;
+    }
+    if (key == GLFW_KEY_7 && action == GLFW_PRESS)
+    {
+        selected_item = 7;
+    }
+    if (key == GLFW_KEY_DELETE && action == GLFW_PRESS)
+    {
+        delete_button = true;
+    }
+}
+
+class Model {
+public: 
+    int size_vert = 0;
+    int begin_vert;
+    int size_ind = 0;
+    int begin_ind;
+    std::string MODEL_PATH;
+};
+
+
+
+
+#ifdef NDEBUG
+const bool enableValidationLayers = false;
+#else
+const bool enableValidationLayers = true;
+#endif
+
+
+
+VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
+    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+    }
+    else {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+}
+
+void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) {
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        func(instance, debugMessenger, pAllocator);
+    }
+}
+
+struct QueueFamilyIndices {
+    std::optional<uint32_t> graphicsFamily;
+    std::optional<uint32_t> presentFamily;
+
+    bool isComplete() {
+        return graphicsFamily.has_value() && presentFamily.has_value();
+    }
+};
+
+struct SwapChainSupportDetails {
+    VkSurfaceCapabilitiesKHR capabilities;
+    std::vector<VkSurfaceFormatKHR> formats;
+    std::vector<VkPresentModeKHR> presentModes;
+};
+
+struct Vertex {
+    glm::vec3 pos;
+    glm::vec3 color;
+    glm::vec2 texCoord;
+    glm::vec3 modelCenter;
+    glm::int32 rotationCount;
+
+    static VkVertexInputBindingDescription getBindingDescription() {
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(Vertex);
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        return bindingDescription;
+    }
+
+    static std::array<VkVertexInputAttributeDescription, 5> getAttributeDescriptions() {
+        std::array<VkVertexInputAttributeDescription, 5> attributeDescriptions{};
+
+        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(Vertex, color);
+
+        attributeDescriptions[2].binding = 0;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+
+        attributeDescriptions[3].binding = 0;
+        attributeDescriptions[3].location = 3;
+        attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[3].offset = offsetof(Vertex, modelCenter);
+
+        attributeDescriptions[4].binding = 0;
+        attributeDescriptions[4].location = 4;
+        attributeDescriptions[4].format = VK_FORMAT_R32_SINT;
+        attributeDescriptions[4].offset = offsetof(Vertex, rotationCount);
+
+        return attributeDescriptions;
+    }
+
+    bool operator==(const Vertex& other) const {
+        return pos == other.pos && color == other.color && texCoord == other.texCoord;
+    }
+};
+
+namespace std {
+    template<> struct hash<Vertex> {
+        size_t operator()(Vertex const& vertex) const {
+            return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
+        }
+    };
+}
+
+struct UniformBufferObject {
+    alignas(16) glm::mat4 model;
+    alignas(16) glm::mat4 view;
+    alignas(16) glm::mat4 proj;
+};
+
+class Application {
+public:
+    void run() {
+        initWindow();
+        initVulkan();
+        mainLoop();
+        cleanup();
+    }
+
+private:
+    GLFWwindow* window;
+
+    VkInstance instance;
+    VkDebugUtilsMessengerEXT debugMessenger;
+    VkSurfaceKHR surface;
+
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    VkDevice device;
+
+    VkQueue graphicsQueue;
+    VkQueue presentQueue;
+
+    VkSwapchainKHR swapChain;
+    std::vector<VkImage> swapChainImages;
+    VkFormat swapChainImageFormat;
+    VkExtent2D swapChainExtent;
+    std::vector<VkImageView> swapChainImageViews;
+    std::vector<VkFramebuffer> swapChainFramebuffers;
+
+    VkRenderPass renderPass;
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkPipelineLayout pipelineLayout;
+    VkPipeline graphicsPipeline;
+
+    VkCommandPool commandPool;
+
+    VkImage depthImage;
+    VkDeviceMemory depthImageMemory;
+    VkImageView depthImageView;
+
+    VkImage textureImage;
+    VkDeviceMemory textureImageMemory;
+    VkImageView textureImageView;
+    VkSampler textureSampler;
+
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+    VkBuffer vertexBuffer;
+    VkDeviceMemory vertexBufferMemory;
+    VkBuffer indexBuffer;
+    VkDeviceMemory indexBufferMemory;
+
+    std::vector<VkBuffer> uniformBuffers;
+    std::vector<VkDeviceMemory> uniformBuffersMemory;
+
+    VkDescriptorPool descriptorPool;
+    std::vector<VkDescriptorSet> descriptorSets;
+
+    std::vector<VkCommandBuffer> commandBuffers;
+
+    std::vector<VkSemaphore> imageAvailableSemaphores;
+    std::vector<VkSemaphore> renderFinishedSemaphores;
+    std::vector<VkFence> inFlightFences;
+    std::vector<VkFence> imagesInFlight;
+    size_t currentFrame = 0;
+
+    bool framebufferResized = false;
+
+    class Wire {
+    public:
+        float begin[3];
+        float end[3];
+        bool DESTROY = false;
+        Model model;
+    };
+
+    std::vector<Wire> wires;
+
+    class Signal {
+    public:
+        float begin[3];
+        float end[3];
+        bool generating = false;
+        bool DESTROY = false;
+        float dest[3];
+        Model model;
+    };
+    std::vector<Signal> signals;
+
+    class generator {
+    public:
+        float center[3];
+        float out_coord[3];
+        int rotate_count;
+        bool generating = false;
+        bool signal_on_out = false;
+        int signal_ind = -1;
+        bool DESTROY = false;
+        Model model;
+        void SetOut() {
+            switch (rotate_count % 4)
+            {
+            case 0:
+
+                out_coord[0] = center[0];
+                out_coord[1] = center[1] - 0.5;
+                out_coord[2] = center[2];
+                break;
+            case 1:
+
+                out_coord[0] = center[0] + 0.5;
+                out_coord[1] = center[1];
+                out_coord[2] = center[2];
+                break;
+            case 2:
+
+                out_coord[0] = center[0];
+                out_coord[1] = center[1] + 0.5;
+                out_coord[2] = center[2];
+                break;
+            case 3:
+               
+                out_coord[0] = center[0] - 0.5;
+                out_coord[1] = center[1];
+                out_coord[2] = center[2];
+                break;
+            }
+        }
+    };
+    std::vector<generator> gens;
+
+    class indicator {
+    public:
+        float center[3];
+        float in_coord[3];
+        int rotate_count;
+        bool ligth = false;
+        bool DESTROY = false;
+        Model model;
+        void Setin() {
+            switch (rotate_count % 4)
+            {
+            case 0:
+
+                in_coord[0] = center[0];
+                in_coord[1] = center[1] - 0.5;
+                in_coord[2] = center[2];
+                break;
+            case 1:
+
+                in_coord[0] = center[0] + 0.5;
+                in_coord[1] = center[1];
+                in_coord[2] = center[2];
+                break;
+            case 2:
+
+                in_coord[0] = center[0];
+                in_coord[1] = center[1] + 0.5;
+                in_coord[2] = center[2];
+                break;
+            case 3:
+
+                in_coord[0] = center[0] - 0.5;
+                in_coord[1] = center[1];
+                in_coord[2] = center[2];
+                break;
+            }
+        }
+    };
+    std::vector<indicator> inds;
+
+    class split {
+    public:
+        float center[3];
+        bool generating[4] = { false, false, false, false };
+        bool signal_on_out[4] = { false, false, false, false };
+        int signal_ind[4] = { -1, -1, -1, -1 };
+        bool DESTROY = false;
+        Model model;
+        void Proceed(std::vector<Signal>& signals) {
+            for (int i = 0; i < signals.size(); i++) {
+                if ((abs(signals[i].begin[0] - center[0]) < 0.01) && (abs(signals[i].begin[1] - (center[1] - 0.5)) < 0.01)) {
+                    generating[0] = false;
+                    generating[1] = true;
+                    generating[2] = true;
+                    generating[3] = true;
+                    break;
+                }else
+                if ((abs(signals[i].begin[0] - (center[0] + 0.5)) < 0.01) && (abs(signals[i].begin[1] - center[1] ) < 0.01)) {
+                    generating[0] = true;
+                    generating[1] = false;
+                    generating[2] = true;
+                    generating[3] = true;
+                    break;
+                }else
+                if ((abs(signals[i].begin[0] - center[0]) < 0.01) && (abs(signals[i].begin[1] - (center[1] + 0.5)) < 0.01)) {
+                    generating[0] = true;
+                    generating[1] = true;
+                    generating[2] = false;
+                    generating[3] = true;
+                    break;
+                }else
+                if ((abs(signals[i].begin[0] - (center[0] - 0.5)) < 0.01) && (abs(signals[i].begin[1] - center[1]) < 0.01)) {
+                    generating[0] = true;
+                    generating[1] = true;
+                    generating[2] = true;
+                    generating[3] = false;
+                    break;
+                }else
+                {
+                generating[0] = false;
+                generating[1] = false;
+                generating[2] = false;
+                generating[3] = false;
+                }
+            }
+        }
+    };
+    std::vector <split> splits;
+    
+    class Invert {
+    public:
+        float center[3];
+        float delay;
+        int rotate_count;
+        float in_coord[3];
+        float out_coord[3];
+        bool generating = false;
+        bool signal_on_out = false;
+        bool DESTROY = false;
+        int signal_ind = -1;
+        Model model;
+        void Proceed(std::vector<Signal> &signals) {
+            for (int i = 0; i < signals.size(); i++) {
+                if ((abs(in_coord[0] - signals[i].begin[0]) < 0.01) 
+                    && (abs(in_coord[1] - signals[i].begin[1]) < 0.01)) {
+                    generating = false;
+                    break;
+                }
+                else {
+                    generating = true;
+                }
+            }
+            if (!signals.size()) {
+                generating = true;
+            }
+        }
+        void SetInOuts() {
+            switch (rotate_count%4)
+            {
+            case 0:
+                in_coord[0] = center[0];
+                in_coord[1] = center[1] + 1;
+                in_coord[2] = center[2];
+
+                out_coord[0] = center[0];
+                out_coord[1] = center[1] - 1;
+                out_coord[2] = center[2];
+                break;
+            case 1:
+                in_coord[0] = center[0] - 1;
+                in_coord[1] = center[1];
+                in_coord[2] = center[2];
+
+                out_coord[0] = center[0] + 1;
+                out_coord[1] = center[1];
+                out_coord[2] = center[2];
+                break;
+            case 2:
+                in_coord[0] = center[0];
+                in_coord[1] = center[1] - 1;
+                in_coord[2] = center[2];
+
+                out_coord[0] = center[0];
+                out_coord[1] = center[1] + 1;
+                out_coord[2] = center[2];
+                break;
+            case 3:
+                in_coord[0] = center[0] + 1;
+                in_coord[1] = center[1];
+                in_coord[2] = center[2];
+
+                out_coord[0] = center[0] - 1;
+                out_coord[1] = center[1];
+                out_coord[2] = center[2];
+                break;
+            }
+        }
+    };
+    std::vector<Invert> Inverts;
+
+    class And2 {
+    private:
+        bool in1 = false, in2 = false;
+    public:
+        float center[3];
+        float delay;
+        int rotate_count;
+        float in1_coord[3];
+        float in2_coord[3];
+        float out_coord[3];
+        bool generating = false;
+        bool signal_on_out = false;
+        bool DESTROY = false;
+        int signal_ind = -1;
+        Model model;
+        void Proceed(std::vector<Signal>& signals) {
+            for (int i = 0; i < signals.size(); i++) {
+                if ((abs(in1_coord[0] - signals[i].begin[0]) < 0.01) && (abs(in1_coord[1] - signals[i].begin[1]) < 0.01)) {
+                    in1 = true;
+                }
+                if ((abs(in2_coord[0] - signals[i].begin[0]) < 0.01) && (abs(in2_coord[1] - signals[i].begin[1]) < 0.01)) {
+                    in2 = true;
+                }
+                if (in1 && in2) {
+                    generating = true;
+                    break;
+                }
+            }
+            if (!(in1 && in2)) {
+                generating = false;
+            }
+            if (!signals.size()) {
+                generating = false;
+            }
+            in1 = false;
+            in2 = false;
+        }
+        void SetInOuts() {
+            switch (rotate_count % 4)
+            {
+            case 0:
+                in1_coord[0] = center[0] - 0.5;
+                in1_coord[1] = center[1] + 1;
+                in1_coord[2] = center[2];
+
+                in2_coord[0] = center[0] + 0.5;
+                in2_coord[1] = center[1] + 1;
+                in2_coord[2] = center[2];
+
+                out_coord[0] = center[0];
+                out_coord[1] = center[1] - 1;
+                out_coord[2] = center[2];
+                break;
+            case 1:
+                in1_coord[0] = center[0] - 1;
+                in1_coord[1] = center[1] - 0.5;
+                in1_coord[2] = center[2];
+
+                in1_coord[0] = center[0] - 1;
+                in1_coord[1] = center[1] + 0.5;
+                in1_coord[2] = center[2];
+
+                out_coord[0] = center[0] + 1;
+                out_coord[1] = center[1];
+                out_coord[2] = center[2];
+                break;
+            case 2:
+                in1_coord[0] = center[0] - 0.5;
+                in1_coord[1] = center[1] - 1;
+                in1_coord[2] = center[2];
+
+                in2_coord[0] = center[0] + 0.5;
+                in2_coord[1] = center[1] - 1;
+                in2_coord[2] = center[2];
+
+                out_coord[0] = center[0];
+                out_coord[1] = center[1] + 1;
+                out_coord[2] = center[2];
+                break;
+            case 3:
+                in1_coord[0] = center[0] + 1;
+                in1_coord[1] = center[1] - 0.5;
+                in1_coord[2] = center[2];
+
+                in2_coord[0] = center[0] + 1;
+                in2_coord[1] = center[1] + 0.5;
+                in2_coord[2] = center[2];
+
+                out_coord[0] = center[0] - 1;
+                out_coord[1] = center[1];
+                out_coord[2] = center[2];
+                break;
+            }
+        }
+    };
+    std::vector<And2> Ands;
+
+    class Or2 {
+    private:
+        bool in1 = false, in2 = false;
+    public:
+        float center[3];
+        float delay;
+        int rotate_count;
+        float in1_coord[3];
+        float in2_coord[3];
+        float out_coord[3];
+        bool generating = false;
+        bool signal_on_out = false;
+        bool DESTROY = false;
+        int signal_ind = -1;
+        Model model;
+        void Proceed(std::vector<Signal>& signals) {
+            for (int i = 0; i < signals.size(); i++) {
+                if ((abs(in1_coord[0] - signals[i].begin[0]) < 0.00001) && (abs(in1_coord[1] - signals[i].begin[1]) < 0.00001)) {
+                    in1 = true;
+                }
+                if ((abs(in2_coord[0] - signals[i].begin[0]) < 0.00001) && (abs(in2_coord[1] - signals[i].begin[1]) < 0.00001)) {
+                    in2 = true;
+                }
+                if (in1 || in2) {
+                    generating = true;
+                    break;
+                }
+            }
+            if (!(in1 || in2)) {
+                generating = false;
+            }
+            if (!signals.size()) {
+                generating = false;
+            }
+            in1 = false;
+            in2 = false;
+        }
+        void SetInOuts() {
+            switch (rotate_count % 4)
+            {
+            case 0:
+                in1_coord[0] = center[0] - 0.5;
+                in1_coord[1] = center[1] + 1;
+                in1_coord[2] = center[2];
+
+                in2_coord[0] = center[0] + 0.5;
+                in2_coord[1] = center[1] + 1;
+                in2_coord[2] = center[2];
+
+                out_coord[0] = center[0];
+                out_coord[1] = center[1] - 1;
+                out_coord[2] = center[2];
+                break;
+            case 1:
+                in1_coord[0] = center[0] - 1;
+                in1_coord[1] = center[1] - 0.5;
+                in1_coord[2] = center[2];
+
+                in1_coord[0] = center[0] - 1;
+                in1_coord[1] = center[1] + 0.5;
+                in1_coord[2] = center[2];
+
+                out_coord[0] = center[0] + 1;
+                out_coord[1] = center[1];
+                out_coord[2] = center[2];
+                break;
+            case 2:
+                in1_coord[0] = center[0] - 0.5;
+                in1_coord[1] = center[1] - 1;
+                in1_coord[2] = center[2];
+
+                in2_coord[0] = center[0] + 0.5;
+                in2_coord[1] = center[1] - 1;
+                in2_coord[2] = center[2];
+
+                out_coord[0] = center[0];
+                out_coord[1] = center[1] + 1;
+                out_coord[2] = center[2];
+                break;
+            case 3:
+                in1_coord[0] = center[0] + 1;
+                in1_coord[1] = center[1] - 0.5;
+                in1_coord[2] = center[2];
+
+                in2_coord[0] = center[0] + 1;
+                in2_coord[1] = center[1] + 0.5;
+                in2_coord[2] = center[2];
+
+                out_coord[0] = center[0] - 1;
+                out_coord[1] = center[1];
+                out_coord[2] = center[2];
+                break;
+            }
+        }
+    };
+    std::vector<Or2> Ors;
+
+    bool GenerateSignal(Signal &in, float x, float y, float z) {
+        int dir;
+        bool flag = false;
+        for (int i = 0; i < wires.size(); i++) {
+            if ((wires[i].begin[0] == x) && (wires[i].begin[1] == y) && (wires[i].begin[2] == z)) {
+                in.begin[0] = wires[i].begin[0];
+                in.begin[1] = wires[i].begin[1];
+                in.begin[2] = wires[i].begin[2];
+
+                in.generating = true;
+
+                in.dest[0] = wires[i].end[0];
+                in.dest[1] = wires[i].end[1];
+                in.dest[2] = wires[i].end[2];
+                flag = true;
+                break;
+            }
+            else
+                if ((wires[i].end[0] == x) && (wires[i].end[1] == y) && (wires[i].end[2] == z)) {
+                    in.begin[0] = wires[i].end[0];
+                    in.begin[1] = wires[i].end[1];
+                    in.begin[2] = wires[i].end[2];
+
+                    in.end[0] = wires[i].end[0];
+                    in.end[1] = wires[i].end[1];
+                    in.end[2] = wires[i].end[2];
+
+                    in.generating = true;
+
+                    in.dest[0] = wires[i].begin[0];
+                    in.dest[1] = wires[i].begin[1];
+                    in.dest[2] = wires[i].begin[2];
+                    flag = true;
+                    break;
+                }
+        }
+        if ((in.begin[0] - in.dest[0] > 0.00001) || (in.begin[0] - in.dest[0] < -0.00001)) {
+            dir = in.dest[0] > in.begin[0] ? 1 : -1;
+            in.end[0] = in.begin[0] - (0.1 * dir);
+            in.end[1] = in.begin[1];
+            in.end[2] = in.begin[2];
+        }
+        else {
+            dir = in.dest[1] > in.begin[1] ? 1 : -1;
+            in.end[0] = in.begin[0];
+            in.end[1] = in.begin[1] - (0.1 * dir);
+            in.end[2] = in.begin[2];
+        }
+        return flag;
+    }
+
+    void signalProceed(Signal& in) {
+        int dir;
+        if ((in.dest[0] - in.begin[0] > 0.01) || (in.dest[0] - in.begin[0] < -0.01)) {                 // передвигаем начало до конца провода
+            dir = in.dest[0] > in.begin[0] ? 1 : -1;
+            in.begin[0] += 0.01 * dir;
+            moveHalfModel(in.model, 0.01 * dir, 0, 0, true);
+        }
+        else if ((in.dest[1] - in.begin[1] > 0.01) || (in.dest[1] - in.begin[1] < -0.01)) {
+            dir = in.dest[1] > in.begin[1] ? 1 : -1;
+            in.begin[1] += 0.01 * dir;
+            moveHalfModel(in.model, 0, 0.01 * dir, 0, true);
+        } 
+        if (!in.generating) {                       // передвигаем конец если не происходит генерация сигнала
+            if ((in.dest[0] - in.end[0] > 0.01) || (in.dest[0] - in.end[0] < -0.01)) {
+                dir = in.dest[0] > in.end[0] ? 1 : -1;
+                in.end[0] += 0.01 * dir;
+                moveHalfModel(in.model, 0.01 * dir, 0, 0, false);
+            }
+            else if ((in.dest[1] - in.end[1] > 0.01) || (in.dest[1] - in.end[1] < -0.01)) {
+                dir = in.dest[1] > in.end[1] ? 1 : -1;
+                in.end[1] += 0.01 * dir;
+                moveHalfModel(in.model, 0, 0.01 * dir, 0, false);
+            }
+        }
+        if (abs(in.begin[0] - in.end[0]) < 0.01 && abs(in.begin[1] - in.end[1]) < 0.01) { // конец соединился с началом
+            in.DESTROY = true;
+
+        }
+
+        
+    }
+
+    void Switch(generator &gen) {
+        if (gen.generating) {
+            for (int i = gen.model.begin_vert; i < gen.model.begin_vert + gen.model.size_vert; i++) {
+                vertices[i].texCoord[1] -= 0.13;
+            }
+            gen.generating = false;
+        }
+        else {
+            for (int i = gen.model.begin_vert; i < gen.model.begin_vert + gen.model.size_vert; i++) {
+                vertices[i].texCoord[1] += 0.13;
+            }
+            gen.generating = true;
+        }
+    }
+
+    void TurnOn(indicator& ind) {
+        if (ind.ligth) {
+            for (int i = ind.model.begin_vert; i < ind.model.begin_vert + ind.model.size_vert; i++) {
+                vertices[i].texCoord[1] += 0.13;
+            }
+        }
+        else {
+            for (int i = ind.model.begin_vert; i < ind.model.begin_vert + ind.model.size_vert; i++) {
+                vertices[i].texCoord[1] -= 0.13;
+            }
+        }
+    }
+
+    int rotate_count_coursor = 0;
+    int old_selected_item = 0;
+    Model selected_model = {0,0,0,0,""};
+    float old_camerax = 0;
+    float old_cameray = 0;
+    Model coursor = { 0,0,0,0,"" };
+    float wireplace = false;
+    float begin[3], end[3];
+
+    void initWindow() {
+        glfwInit();
+
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
+        window = glfwCreateWindow(WIDTH, HEIGHT, "Program", nullptr, nullptr);
+        glfwSetWindowUserPointer(window, this);
+        glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+    }
+
+    static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
+        auto app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
+        app->framebufferResized = true;
+    }
+
+    void initVulkan() {
+        createInstance();
+        setupDebugMessenger();
+        createSurface();
+        pickPhysicalDevice();
+        createLogicalDevice();
+        createSwapChain();
+        createImageViews();
+        createRenderPass();
+        createDescriptorSetLayout();
+        createGraphicsPipeline();
+        createCommandPool();
+        createDepthResources();
+        createFramebuffers();
+        createTextureImage();
+        createTextureImageView();
+        createTextureSampler();
+
+        createVertexBuffer();
+        createIndexBuffer();
+        createUniformBuffers();
+
+        createDescriptorPool();
+
+        createDescriptorSets();
+
+        createCommandBuffers();
+
+        createSyncObjects();
+        generateWire(coursor, 0.08, 0, -0.08, 0, 0.08, true);
+        loadModelToBuffer();
+    }
+
+    void mainLoop() {
+        while (!glfwWindowShouldClose(window)) {
+            glfwPollEvents();
+            glfwSetKeyCallback(window, keyboard);
+            if (old_selected_item != selected_item) {
+                if (selected_item == 1) {
+                    selected_model.MODEL_PATH = "";
+                }
+                if (selected_item == 2) {
+                    selected_model.MODEL_PATH = "models/invertor.obj";
+                }
+                if (selected_item == 3) {
+                    selected_model.MODEL_PATH = "models/2and.obj";
+                }
+                if (selected_item == 4) {
+                    selected_model.MODEL_PATH = "models/2or.obj";
+                }
+                if (selected_item == 5) {
+                    selected_model.MODEL_PATH = "models/split.obj";
+                }
+                if (selected_item == 6) {
+                    selected_model.MODEL_PATH = "models/gen.obj";
+                }
+                if (selected_item == 7) {
+                    selected_model.MODEL_PATH = "models/ind.obj";
+                }
+
+                for (auto& w : wires) {
+                    if (w.model.begin_vert > selected_model.begin_vert) {
+                        w.model.begin_vert -= selected_model.size_vert;
+                        w.model.begin_ind -= selected_model.size_ind;
+                    }
+                }
+                for (auto& s : signals) {
+                    if (s.model.begin_vert > selected_model.begin_vert) {
+                        s.model.begin_vert -= selected_model.size_vert;
+                        s.model.begin_ind -= selected_model.size_ind;
+                    }
+                }
+                for (auto& inv : Inverts) {
+                    if (inv.model.begin_vert > selected_model.begin_vert) {
+                        inv.model.begin_vert -= selected_model.size_vert;
+                        inv.model.begin_ind -= selected_model.size_ind;
+                    }
+                }
+                for (auto& an : Ands) {
+                    if (an.model.begin_vert > selected_model.begin_vert) {
+                        an.model.begin_vert -= selected_model.size_vert;
+                        an.model.begin_ind -= selected_model.size_ind;
+                    }
+                }
+                for (auto& o : Ors) {
+                    if (o.model.begin_vert > selected_model.begin_vert) {
+                        o.model.begin_vert -= selected_model.size_vert;
+                        o.model.begin_ind -= selected_model.size_ind;
+                    }
+                }
+                for (auto& s : splits) {
+                    if (s.model.begin_vert > selected_model.begin_vert) {
+                        s.model.begin_vert -= selected_model.size_vert;
+                        s.model.begin_ind -= selected_model.size_ind;
+                    }
+                }
+                
+                deleteModel(selected_model);
+                if (selected_model.MODEL_PATH != "") {
+                    loadModel(selected_model, roundf(camerax * 2) / 2, roundf(cameray * 2) / 2, 0);
+                    rotateModel(selected_model, rotate_count_coursor);
+                }
+                loadModelToBuffer();
+            }
+
+            old_selected_item = selected_item;
+
+            if (abs(old_camerax - camerax) > 0.00001 || abs(old_cameray - cameray) > 0.00001) {
+                moveModel(selected_model, roundf(camerax * 2) / 2 - roundf(old_camerax * 2) / 2, roundf(cameray * 2) / 2 - roundf(old_cameray * 2) / 2, 0);
+                moveModel(coursor, roundf(camerax * 2) / 2 - roundf(old_camerax * 2) / 2, roundf(cameray * 2) / 2 - roundf(old_cameray * 2) / 2, 0);
+                loadModelToBuffer();
+            }
+
+            old_camerax = camerax;
+            old_cameray = cameray;
+
+            if (r_button) {
+                rotate_count_coursor = (rotate_count_coursor + 1) % 4;
+                rotateModel(selected_model, rotate_count_coursor);
+                loadModelToBuffer();
+                r_button = false;
+            }
+            if (enter_button) {
+                if (selected_item == 1) {
+                    if (!wireplace) {
+                        begin[0] = roundf(camerax * 2) / 2;
+                        begin[1] = roundf(cameray * 2) / 2;
+                        begin[2] = 0;
+                        wireplace = true;
+                        
+                    }
+                    else
+                    {
+                        if (abs(begin[0] - roundf(camerax * 2) / 2) > 0.0001 || abs(begin[1] - roundf(cameray * 2) / 2) > 0.0001) {
+                            if (abs(begin[0] - roundf(camerax * 2) / 2) > abs(begin[1] - roundf(cameray * 2) / 2)) {
+                                end[0] = roundf(camerax * 2) / 2;
+                                end[1] = begin[1];
+                                end[2] = 0;
+                            }
+                            else {
+                                end[0] = begin[0];
+                                end[1] = roundf(cameray * 2) / 2;
+                                end[2] = 0;
+                            }
+                            Wire w;
+                            generateWire(w.model, begin[0], begin[1], end[0], end[1], 0.08, false);
+                            w.begin[0] = begin[0];
+                            w.begin[1] = begin[1];
+                            w.begin[2] = begin[2];
+
+                            w.end[0] = end[0];
+                            w.end[1] = end[1];
+                            w.end[2] = end[2];
+                            wires.push_back(w);
+                            loadModelToBuffer();
+                            wireplace = false;
+                        }
+                    }
+                }
+                if (selected_item == 2) {
+                    Invert inv;
+                    inv.center[0] = roundf(camerax * 2) / 2;
+                    inv.center[1] = roundf(cameray * 2) / 2;
+                    inv.center[2] = 0;
+                    inv.rotate_count = rotate_count_coursor;
+                    inv.SetInOuts();
+                    inv.model = selected_model;
+                    Inverts.push_back(inv);
+                    selected_model.begin_ind = 0;
+                    selected_model.begin_vert = 0;
+                    selected_model.size_ind = 0;
+                    selected_model.size_vert = 0;
+                    selected_model.MODEL_PATH = "";
+                    selected_item = 0;
+                }
+                if (selected_item == 3) {
+                    And2 a;
+                    a.center[0] = roundf(camerax * 2) / 2;
+                    a.center[1] = roundf(cameray * 2) / 2;
+                    a.center[2] = 0;
+                    a.rotate_count = rotate_count_coursor;
+                    a.SetInOuts();
+                    a.model = selected_model;
+                    Ands.push_back(a);
+                    selected_model.begin_ind = 0;
+                    selected_model.begin_vert = 0;
+                    selected_model.size_ind = 0;
+                    selected_model.size_vert = 0;
+                    selected_model.MODEL_PATH = "";
+                    selected_item = 0;
+                }
+                if (selected_item == 4) {
+                    Or2 o;
+                    o.center[0] = roundf(camerax * 2) / 2;
+                    o.center[1] = roundf(cameray * 2) / 2;
+                    o.center[2] = 0;
+                    o.rotate_count = rotate_count_coursor;
+                    o.SetInOuts();
+                    o.model = selected_model;
+                    Ors.push_back(o);
+                    selected_model.begin_ind = 0;
+                    selected_model.begin_vert = 0;
+                    selected_model.size_ind = 0;
+                    selected_model.size_vert = 0;
+                    selected_model.MODEL_PATH = "";
+                    selected_item = 0;
+                }
+                if (selected_item == 5) {
+                    split s;
+                    s.center[0] = roundf(camerax * 2) / 2;
+                    s.center[1] = roundf(cameray * 2) / 2;
+                    s.center[2] = 0;
+                    s.model = selected_model;
+
+                    splits.push_back(s);
+
+                    selected_model.begin_ind = 0;
+                    selected_model.begin_vert = 0;
+                    selected_model.size_ind = 0;
+                    selected_model.size_vert = 0;
+                    selected_model.MODEL_PATH = "";
+                    selected_item = 0;
+                }
+                if (selected_item == 6) {
+                    generator gen;
+                    gen.center[0] = roundf(camerax * 2) / 2;
+                    gen.center[1] = roundf(cameray * 2) / 2;
+                    gen.center[2] = 0;
+
+                    gen.rotate_count = rotate_count_coursor;
+                    gen.SetOut();
+                    gen.model = selected_model;
+                    gens.push_back(gen);
+
+                    selected_model.begin_ind = 0;
+                    selected_model.begin_vert = 0;
+                    selected_model.size_ind = 0;
+                    selected_model.size_vert = 0;
+                    selected_model.MODEL_PATH = "";
+                    selected_item = 0;
+                }
+                if (selected_item == 7) {
+                    indicator ind;
+                    ind.center[0] = roundf(camerax * 2) / 2;
+                    ind.center[1] = roundf(cameray * 2) / 2;
+                    ind.center[2] = 0;
+
+                    ind.rotate_count = rotate_count_coursor;
+                    ind.Setin();
+                    ind.model = selected_model;
+                    inds.push_back(ind);
+
+                    selected_model.begin_ind = 0;
+                    selected_model.begin_vert = 0;
+                    selected_model.size_ind = 0;
+                    selected_model.size_vert = 0;
+                    selected_model.MODEL_PATH = "";
+                    selected_item = 0;
+                }
+                enter_button = false;
+            }
+
+            if (delete_button) {
+
+                for (auto& w : wires) {
+                    if (abs(w.begin[0] - w.end[0]) > 0.00001) {
+                        if (abs(((w.begin[0] + w.end[0]) / 2) - roundf(camerax * 2) / 2) <= abs(w.begin[0] - w.end[0]) / 2 && abs(w.begin[1] - roundf(cameray * 2) / 2) < 0.0001) {
+                            w.DESTROY = true;
+                        }
+                    }else
+                        if (abs(((w.begin[1] + w.end[1]) / 2) - roundf(cameray * 2) / 2) <= abs(w.begin[1] - w.end[1]) / 2 && abs(w.begin[0] - roundf(camerax * 2) / 2) < 0.0001) {
+                            w.DESTROY = true;
+                        }
+                }
+                for (auto& inv : Inverts) {
+                    if (abs(inv.center[0] - roundf(camerax * 2) / 2) < 1 && abs(inv.center[1] - roundf(cameray * 2) / 2) < 1) {
+                        inv.DESTROY = true;
+                    }
+                }
+                for (auto& an : Ands) {
+                    if (abs(an.center[0] - roundf(camerax * 2) / 2) < 1 && abs(an.center[1] - roundf(cameray * 2) / 2) < 1) {
+                        an.DESTROY = true;
+                    }
+                }
+                for (auto& o : Ors) {
+                    if (abs(o.center[0] - roundf(camerax * 2) / 2) < 1 && abs(o.center[1] - roundf(cameray * 2) / 2) < 1) {
+                        o.DESTROY = true;
+                    }
+                }
+                delete_button = false;
+            }
+            
+           
+
+            if (go) {
+                generator gen;
+                gen.model.MODEL_PATH = "models/gen.obj";
+                loadModel(gen.model, 2, 2, 0);
+                gen.rotate_count = 0;
+                gen.SetOut();
+                gens.push_back(gen);
+                Switch(gen);
+
+                Wire test, test2, test3, test4;
+                test.begin[0] = 1;
+                test.begin[1] = 0;
+                test.begin[2] = 0;
+
+                test.end[0] = 0;
+                test.end[1] = 0;
+                test.end[2] = 0;
+
+                test2.begin[0] = 1;
+                test2.begin[1] = 1;
+                test2.begin[2] = 0;
+
+                test2.end[0] = 0;
+                test2.end[1] = 1;
+                test2.end[2] = 0;
+
+                test3.begin[0] = -2;
+                test3.begin[1] = 0.5;
+                test3.begin[2] = 0;
+
+                test3.end[0] = -3;
+                test3.end[1] = 0.5;
+                test3.end[2] = 0;
+
+                test4.begin[0] = -5;
+                test4.begin[1] = 0.5;
+                test4.begin[2] = 0;
+
+                test4.end[0] = -6;
+                test4.end[1] = 0.5;
+                test4.end[2] = 0;
+
+                generateWire(test.model, test.begin[0], test.begin[1], test.end[0], test.end[1], 0.08, false);
+
+                generateWire(test2.model, test2.begin[0], test2.begin[1], test2.end[0], test2.end[1], 0.08, false);
+
+                generateWire(test3.model, test3.begin[0], test3.begin[1], test3.end[0], test3.end[1], 0.08, false);
+
+                generateWire(test4.model, test4.begin[0], test4.begin[1], test4.end[0], test4.end[1], 0.08, false);
+
+                wires.push_back(test);
+
+                wires.push_back(test2);
+
+                wires.push_back(test3);
+
+                wires.push_back(test4);
+
+                
+
+                Signal sig, sig2;
+                GenerateSignal(sig, 1, 0, 0);
+                generateWire(sig.model, sig.begin[0], sig.begin[1], sig.end[0], sig.end[1], 0.09, true);
+
+                GenerateSignal(sig2, 1, 1, 0);
+                generateWire(sig2.model, sig2.begin[0], sig2.begin[1], sig2.end[0], sig2.end[1], 0.09, true);
+
+                signals.push_back(sig);
+                
+                signals.push_back(sig2);
+                
+                
+                loadModelToBuffer();
+                go = false;
+            }
+            if (go1) {
+                signals[0].generating = false;
+                go1 = false;
+            }
+            if (go2) {
+                Switch(gens[0]);
+                loadModelToBuffer();
+                go2 = false;
+            }
+            if (go3) {
+                Switch(gens[1]);
+                loadModelToBuffer();
+                go3 = false;
+            }
+
+            for (int i = 0; i < wires.size(); i++) {
+                if (wires[i].DESTROY) {
+                    for (auto& w : wires) {
+                        if (w.model.begin_vert > wires[i].model.begin_vert) {
+                            w.model.begin_vert -= wires[i].model.size_vert;
+                            w.model.begin_ind -= wires[i].model.size_ind;
+                        }
+                    }
+                    for (auto& s : signals) {
+                        if (s.model.begin_vert > wires[i].model.begin_vert) {
+                            s.model.begin_vert -= wires[i].model.size_vert;
+                            s.model.begin_ind -= wires[i].model.size_ind;
+                        }
+                    }
+                    for (auto& inv : Inverts) {
+                        if (inv.model.begin_vert > wires[i].model.begin_vert) {
+                            inv.model.begin_vert -= wires[i].model.size_vert;
+                            inv.model.begin_ind -= wires[i].model.size_ind;
+                        }
+                    }
+                    for (auto& an : Ands) {
+                        if (an.model.begin_vert > wires[i].model.begin_vert) {
+                            an.model.begin_vert -= wires[i].model.size_vert;
+                            an.model.begin_ind -= wires[i].model.size_ind;
+                        }
+                    }
+                    for (auto& o : Ors) {
+                        if (o.model.begin_vert > wires[i].model.begin_vert) {
+                            o.model.begin_vert -= wires[i].model.size_vert;
+                            o.model.begin_ind -= wires[i].model.size_ind;
+                        }
+                    }
+                    deleteModel(wires[i].model);
+                    wires.erase(wires.begin() + i);
+                    loadModelToBuffer();
+                }
+            }
+
+            for (int i = 0; i < Ands.size(); i++) {
+                Ands[i].Proceed(signals);
+                if (Ands[i].DESTROY) {
+                    for (auto& w : wires) {
+                        if (w.model.begin_vert > Ands[i].model.begin_vert) {
+                            w.model.begin_vert -= Ands[i].model.size_vert;
+                            w.model.begin_ind -= Ands[i].model.size_ind;
+                        }
+                    }
+                    for (auto& s : signals) {
+                        if (s.model.begin_vert > Ands[i].model.begin_vert) {
+                            s.model.begin_vert -= Ands[i].model.size_vert;
+                            s.model.begin_ind -= Ands[i].model.size_ind;
+                        }
+                    }
+                    for (auto& inv : Inverts) {
+                        if (inv.model.begin_vert > Ands[i].model.begin_vert) {
+                            inv.model.begin_vert -= Ands[i].model.size_vert;
+                            inv.model.begin_ind -= Ands[i].model.size_ind;
+                        }
+                    }
+                    for (auto& an : Ands) {
+                        if (an.model.begin_vert > Ands[i].model.begin_vert) {
+                            an.model.begin_vert -= Ands[i].model.size_vert;
+                            an.model.begin_ind -= Ands[i].model.size_ind;
+                        }
+                    }
+                    for (auto& o : Ors) {
+                        if (o.model.begin_vert > Ands[i].model.begin_vert) {
+                            o.model.begin_vert -= Ands[i].model.size_vert;
+                            o.model.begin_ind -= Ands[i].model.size_ind;
+                        }
+                    }
+                    deleteModel(Ands[i].model);
+                    Ands.erase(Ands.begin() + i);
+                    loadModelToBuffer();
+                }
+                else {
+                    bool wire_here = false;
+                    for (auto& w : wires) {
+                        if ((abs(w.begin[0] - Ands[i].out_coord[0]) < 0.0001 && abs(w.begin[1] - Ands[i].out_coord[1]) < 0.0001)
+                            || (abs(w.end[0] - Ands[i].out_coord[0]) < 0.0001 && abs(w.end[1] - Ands[i].out_coord[1]) < 0.0001)) {
+                            wire_here = true;
+                        }
+                    }
+                    if (Ands[i].generating && !Ands[i].signal_on_out) {
+                        Signal sig;
+                        GenerateSignal(sig, Ands[i].out_coord[0], Ands[i].out_coord[1], Ands[i].out_coord[2]);
+                        generateWire(sig.model, sig.begin[0], sig.begin[1], sig.end[0], sig.end[1], 0.09, true);
+                        Ands[i].signal_ind = signals.size();
+                        signals.push_back(sig);
+                        Ands[i].signal_on_out = true;
+                    }
+                    if (!Ands[i].generating && (Ands[i].signal_ind != -1)) {
+                        Ands[i].signal_on_out = false;
+                        signals[Ands[i].signal_ind].generating = false;
+                        Ands[i].signal_ind = -1;
+                    }
+                }
+            }
+
+            for (int i = 0; i < Ors.size(); i++) {
+                Ors[i].Proceed(signals);
+
+                if (Ors[i].DESTROY) {
+                    for (auto& w : wires) {
+                        if (w.model.begin_vert > Ors[i].model.begin_vert) {
+                            w.model.begin_vert -= Ors[i].model.size_vert;
+                            w.model.begin_ind -= Ors[i].model.size_ind;
+                        }
+                    }
+                    for (auto& s : signals) {
+                        if (s.model.begin_vert > Ors[i].model.begin_vert) {
+                            s.model.begin_vert -= Ors[i].model.size_vert;
+                            s.model.begin_ind -= Ors[i].model.size_ind;
+                        }
+                    }
+                    for (auto& inv : Inverts) {
+                        if (inv.model.begin_vert > Ors[i].model.begin_vert) {
+                            inv.model.begin_vert -= Ors[i].model.size_vert;
+                            inv.model.begin_ind -= Ors[i].model.size_ind;
+                        }
+                    }
+                    for (auto& a : Ands) {
+                        if (a.model.begin_vert > Ors[i].model.begin_vert) {
+                            a.model.begin_vert -= Ors[i].model.size_vert;
+                            a.model.begin_ind -= Ors[i].model.size_ind;
+                        }
+                    }
+                    for (auto& or2 : Ors) {
+                        if (or2.model.begin_vert > Ors[i].model.begin_vert) {
+                            or2.model.begin_vert -= Ors[i].model.size_vert;
+                            or2.model.begin_ind -= Ors[i].model.size_ind;
+                        }
+                    }
+                    deleteModel(Ors[i].model);
+                    Ors.erase(Ors.begin() + i);
+                    loadModelToBuffer();
+                }
+                else {
+                    bool wire_here = false;
+                    for (auto& w : wires) {
+                        if ((abs(w.begin[0] - Ors[i].out_coord[0]) < 0.0001 && abs(w.begin[1] - Ors[i].out_coord[1]) < 0.0001)
+                            || (abs(w.end[0] - Ors[i].out_coord[0]) < 0.0001 && abs(w.end[1] - Ors[i].out_coord[1]) < 0.0001)) {
+                            wire_here = true;
+                        }
+                    }
+                    if (Ors[i].generating && !Ors[i].signal_on_out && wire_here) {
+                        Signal sig;
+                        GenerateSignal(sig, Ors[i].out_coord[0], Ors[i].out_coord[1], Ors[i].out_coord[2]);
+                        generateWire(sig.model, sig.begin[0], sig.begin[1], sig.end[0], sig.end[1], 0.09, true);
+                        Ors[i].signal_ind = signals.size();
+                        signals.push_back(sig);
+                        Ors[i].signal_on_out = true;
+                    }
+                    if (!Ors[i].generating && (Ors[i].signal_ind != -1)) {
+                        Ors[i].signal_on_out = false;
+                        signals[Ors[i].signal_ind].generating = false;
+                        Ors[i].signal_ind = -1;
+                    }
+                }
+            }
+
+            for (int i = 0; i < Inverts.size(); i++) {
+                Inverts[i].Proceed(signals);
+                if (Inverts[i].DESTROY) {
+                    for (auto& w : wires) {
+                        if (w.model.begin_vert > Inverts[i].model.begin_vert) {
+                            w.model.begin_vert -= Inverts[i].model.size_vert;
+                            w.model.begin_ind -= Inverts[i].model.size_ind;
+                        }
+                    }
+                    for (auto& s : signals) {
+                        if (s.model.begin_vert > Inverts[i].model.begin_vert) {
+                            s.model.begin_vert -= Inverts[i].model.size_vert;
+                            s.model.begin_ind -= Inverts[i].model.size_ind;
+                        }
+                    }
+                    for (auto& in : Inverts) {
+                        if (in.model.begin_vert > Inverts[i].model.begin_vert) {
+                            in.model.begin_vert -= Inverts[i].model.size_vert;
+                            in.model.begin_ind -= Inverts[i].model.size_ind;
+                        }
+                    }
+                    for (auto& a : Ands) {
+                        if (a.model.begin_vert > Inverts[i].model.begin_vert) {
+                            a.model.begin_vert -= Inverts[i].model.size_vert;
+                            a.model.begin_ind -= Inverts[i].model.size_ind;
+                        }
+                    }
+                    for (auto& o : Ors) {
+                        if (o.model.begin_vert > Inverts[i].model.begin_vert) {
+                            o.model.begin_vert -= Inverts[i].model.size_vert;
+                            o.model.begin_ind -= Inverts[i].model.size_ind;
+                        }
+                    }
+                    deleteModel(Inverts[i].model);
+                    Inverts.erase(Inverts.begin() + i);
+                    loadModelToBuffer();
+                }
+                else {
+                    bool wire_here = false;
+                    for (auto& w : wires) {
+                        if ((abs(w.begin[0] - Inverts[i].out_coord[0]) < 0.0001 && abs(w.begin[1] - Inverts[i].out_coord[1]) < 0.0001)
+                            || (abs(w.end[0] - Inverts[i].out_coord[0]) < 0.0001 && abs(w.end[1] - Inverts[i].out_coord[1]) < 0.0001)) {
+                            wire_here = true;
+                        }
+                    }
+                    if (Inverts[i].generating && !Inverts[i].signal_on_out && wire_here) {
+                        Signal sig;
+                        GenerateSignal(sig, Inverts[i].out_coord[0], Inverts[i].out_coord[1], Inverts[i].out_coord[2]);
+                        generateWire(sig.model, sig.begin[0], sig.begin[1], sig.end[0], sig.end[1], 0.09, true);
+                        Inverts[i].signal_ind = signals.size();
+                        signals.push_back(sig);
+                        Inverts[i].signal_on_out = true;
+                    }
+                    if (!Inverts[i].generating && (Inverts[i].signal_ind != -1)) {
+                        Inverts[i].signal_on_out = false;
+                        signals[Inverts[i].signal_ind].generating = false;
+                        Inverts[i].signal_ind = -1;
+                    }
+                }
+            }
+
+            for (int i = 0; i < splits.size(); i++) {
+                splits[i].Proceed(signals);
+                if (splits[i].DESTROY) {
+                    for (auto& w : wires) {
+                        if (w.model.begin_vert > splits[i].model.begin_vert) {
+                            w.model.begin_vert -= splits[i].model.size_vert;
+                            w.model.begin_ind -= splits[i].model.size_ind;
+                        }
+                    }
+                    for (auto& s : signals) {
+                        if (s.model.begin_vert > splits[i].model.begin_vert) {
+                            s.model.begin_vert -= splits[i].model.size_vert;
+                            s.model.begin_ind -= splits[i].model.size_ind;
+                        }
+                    }
+                    for (auto& in : Inverts) {
+                        if (in.model.begin_vert > splits[i].model.begin_vert) {
+                            in.model.begin_vert -= splits[i].model.size_vert;
+                            in.model.begin_ind -= splits[i].model.size_ind;
+                        }
+                    }
+                    for (auto& a : Ands) {
+                        if (a.model.begin_vert > splits[i].model.begin_vert) {
+                            a.model.begin_vert -= splits[i].model.size_vert;
+                            a.model.begin_ind -= splits[i].model.size_ind;
+                        }
+                    }
+                    for (auto& o : Ors) {
+                        if (o.model.begin_vert > splits[i].model.begin_vert) {
+                            o.model.begin_vert -= splits[i].model.size_vert;
+                            o.model.begin_ind -= splits[i].model.size_ind;
+                        }
+                    }
+                    deleteModel(splits[i].model);
+                    splits.erase(splits.begin() + i);
+                    loadModelToBuffer();
+                }
+                else {
+                    if (splits[i].generating[0] && !splits[i].signal_on_out[0]) {
+                        Signal sig1;
+                        if (GenerateSignal(sig1, splits[i].center[0], splits[i].center[1] - 0.5, splits[i].center[2])) {
+                            generateWire(sig1.model, sig1.begin[0], sig1.begin[1], sig1.end[0], sig1.end[1], 0.09, true);
+                            splits[i].signal_ind[0] = signals.size();
+                            signals.push_back(sig1);
+                            splits[i].signal_on_out[0] = true;
+                        }
+                    }
+                    if (splits[i].generating[1] && !splits[i].signal_on_out[1]) {
+                        Signal sig1;
+                        if (GenerateSignal(sig1, splits[i].center[0] + 0.5, splits[i].center[1], splits[i].center[2])) {
+                            generateWire(sig1.model, sig1.begin[0], sig1.begin[1], sig1.end[0], sig1.end[1], 0.09, true);
+                            splits[i].signal_ind[1] = signals.size();
+                            signals.push_back(sig1);
+                            splits[i].signal_on_out[1] = true;
+                        }
+                    }
+                    if (splits[i].generating[2] && !splits[i].signal_on_out[2]) {
+                        Signal sig1;
+                        if (GenerateSignal(sig1, splits[i].center[0], splits[i].center[1] + 0.5, splits[i].center[2])) {
+                            generateWire(sig1.model, sig1.begin[0], sig1.begin[1], sig1.end[0], sig1.end[1], 0.09, true);
+                            splits[i].signal_ind[2] = signals.size();
+                            signals.push_back(sig1);
+                            splits[i].signal_on_out[2] = true;
+                        }
+                    }
+                    if (splits[i].generating[3] && !splits[i].signal_on_out[3]) {
+                        Signal sig1;
+                        if (GenerateSignal(sig1, splits[i].center[0] - 0.5, splits[i].center[1], splits[i].center[2])) {
+                            generateWire(sig1.model, sig1.begin[0], sig1.begin[1], sig1.end[0], sig1.end[1], 0.09, true);
+                            splits[i].signal_ind[3] = signals.size();
+                            signals.push_back(sig1);
+                            splits[i].signal_on_out[3] = true;
+                        }
+                    }
+                    if (!splits[i].generating[0] && (splits[i].signal_ind[0] != -1)) {
+                        splits[i].signal_on_out[0] = false;
+                        signals[splits[i].signal_ind[0]].generating = false;
+                        splits[i].signal_ind[0] = -1;
+                    }
+                    if (!splits[i].generating[1] && (splits[i].signal_ind[1] != -1)) {
+                        splits[i].signal_on_out[1] = false;
+                        signals[splits[i].signal_ind[1]].generating = false;
+                        splits[i].signal_ind[1] = -1;
+                    }
+                    if (!splits[i].generating[2] && (splits[i].signal_ind[2] != -1)) {
+                        splits[i].signal_on_out[2] = false;
+                        signals[splits[i].signal_ind[2]].generating = false;
+                        splits[i].signal_ind[2] = -1;
+                    }
+                    if (!splits[i].generating[3] && (splits[i].signal_ind[3] != -1)) {
+                        splits[i].signal_on_out[3] = false;
+                        signals[splits[i].signal_ind[3]].generating = false;
+                        splits[i].signal_ind[3] = -1;
+                    }
+                }
+            }
+
+            for (int i = 0; i < gens.size(); i++) {
+                if (gens[i].generating && !gens[i].signal_on_out) {
+                    Signal sig;
+                    GenerateSignal(sig, gens[i].out_coord[0], gens[i].out_coord[1], gens[i].out_coord[2]);
+                    generateWire(sig.model, sig.begin[0], sig.begin[1], sig.end[0], sig.end[1], 0.09, true);
+                    gens[i].signal_ind = signals.size();
+                    signals.push_back(sig);
+                    gens[i].signal_on_out = true;
+                }
+                if (!gens[i].generating && (gens[i].signal_ind != -1)) {
+                    gens[i].signal_on_out = false;
+                    signals[gens[i].signal_ind].generating = false;
+                    gens[i].signal_ind = -1;
+                }
+            }
+
+            for (int i = 0; i < inds.size(); i++) {
+                bool last_state = inds[i].ligth;
+                for (auto& s : signals) {
+                    if (abs(inds[i].in_coord[0] - s.begin[0]) < 0.01 && abs(inds[i].in_coord[1] - s.begin[1]) < 0.01) {
+                        inds[i].ligth = true;
+                        break;
+                    }
+                    inds[i].ligth = false;
+                }
+                if (!signals.size()) {
+                    inds[i].ligth = false;
+                }
+                if (last_state != inds[i].ligth) {
+                    TurnOn(inds[i]);
+                    loadModelToBuffer();
+                }
+            }
+
+            for (int i = 0; i < signals.size(); i++) {
+                signalProceed(signals[i]);
+                if (signals[i].DESTROY) {
+                    for (auto& w : wires) {
+                        if (w.model.begin_vert > signals[i].model.begin_vert) {
+                            w.model.begin_vert -= signals[i].model.size_vert;
+                            w.model.begin_ind -= signals[i].model.size_ind;
+                        }
+                    }
+                    for (auto& s : signals) {
+                        if (s.model.begin_vert > signals[i].model.begin_vert) {
+                            s.model.begin_vert -= signals[i].model.size_vert;
+                            s.model.begin_ind -= signals[i].model.size_ind;
+                        }
+                    }
+                    for (auto& inv : Inverts) {
+                        if (inv.model.begin_vert > signals[i].model.begin_vert) {
+                            inv.model.begin_vert -= signals[i].model.size_vert;
+                            inv.model.begin_ind -= signals[i].model.size_ind;
+                        }
+                        if (inv.signal_ind > i) {
+                            inv.signal_ind--;
+                        }
+                    }
+                    for (auto& a : Ands) {
+                        if (a.model.begin_vert > signals[i].model.begin_vert) {
+                            a.model.begin_vert -= signals[i].model.size_vert;
+                            a.model.begin_ind -= signals[i].model.size_ind;
+                        }
+                        if (a.signal_ind > i) {
+                            a.signal_ind--;
+                        }
+                    }
+                    for (auto& o : Ors) {
+                        if (o.model.begin_vert > signals[i].model.begin_vert) {
+                            o.model.begin_vert -= signals[i].model.size_vert;
+                            o.model.begin_ind -= signals[i].model.size_ind;
+                        }
+                        if (o.signal_ind > i) {
+                            o.signal_ind--;
+                        }
+                    }
+                    for (auto& g : gens) {
+                        if (g.model.begin_vert > signals[i].model.begin_vert) {
+                            g.model.begin_vert -= signals[i].model.size_vert;
+                            g.model.begin_ind -= signals[i].model.size_ind;
+                        }
+                        if (g.signal_ind > i) {
+                            g.signal_ind--;
+                        }
+                    }
+                    for (auto& s : splits) {
+                        if (s.model.begin_vert > signals[i].model.begin_vert) {
+                            s.model.begin_vert -= signals[i].model.size_vert;
+                            s.model.begin_ind -= signals[i].model.size_ind;
+                        }
+
+                        for(int ind = 0; ind < 4; ind++)
+                            if (s.signal_ind[ind] > i) {
+                                s.signal_ind[ind]--;
+                            }
+                    }
+
+                    deleteModel(signals[i].model);
+                    signals.erase(signals.begin() + i);
+                }
+                loadModelToBuffer();
+            }
+            drawFrame();
+        }
+
+        vkDeviceWaitIdle(device);
+    }
+
+    
+
+    void cleanupSwapChain() {
+        vkDestroyImageView(device, depthImageView, nullptr);
+        vkDestroyImage(device, depthImage, nullptr);
+        vkFreeMemory(device, depthImageMemory, nullptr);
+
+        for (auto framebuffer : swapChainFramebuffers) {
+            vkDestroyFramebuffer(device, framebuffer, nullptr);
+        }
+
+        vkFreeCommandBuffers(device, commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+
+        vkDestroyPipeline(device, graphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+        vkDestroyRenderPass(device, renderPass, nullptr);
+
+        for (auto imageView : swapChainImageViews) {
+            vkDestroyImageView(device, imageView, nullptr);
+        }
+
+        vkDestroySwapchainKHR(device, swapChain, nullptr);
+
+        for (size_t i = 0; i < swapChainImages.size(); i++) {
+            vkDestroyBuffer(device, uniformBuffers[i], nullptr);
+            vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+        }
+
+        vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+    }
+
+    void cleanup() {
+        cleanupSwapChain();
+
+        vkDestroySampler(device, textureSampler, nullptr);
+        vkDestroyImageView(device, textureImageView, nullptr);
+
+        vkDestroyImage(device, textureImage, nullptr);
+        vkFreeMemory(device, textureImageMemory, nullptr);
+
+        vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+
+        vkDestroyBuffer(device, indexBuffer, nullptr);
+        vkFreeMemory(device, indexBufferMemory, nullptr);
+
+        vkDestroyBuffer(device, vertexBuffer, nullptr);
+        vkFreeMemory(device, vertexBufferMemory, nullptr);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+            vkDestroyFence(device, inFlightFences[i], nullptr);
+        }
+
+        vkDestroyCommandPool(device, commandPool, nullptr);
+
+        vkDestroyDevice(device, nullptr);
+
+        if (enableValidationLayers) {
+            DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+        }
+
+        vkDestroySurfaceKHR(instance, surface, nullptr);
+        vkDestroyInstance(instance, nullptr);
+
+        glfwDestroyWindow(window);
+
+        glfwTerminate();
+    }
+
+    void recreateSwapChain() {
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(window, &width, &height);
+        while (width == 0 || height == 0) {
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwWaitEvents();
+        }
+
+        vkDeviceWaitIdle(device);
+
+        cleanupSwapChain();
+
+        createSwapChain();
+        createImageViews();
+        createRenderPass();
+        createGraphicsPipeline();
+        createDepthResources();
+        createFramebuffers();
+        createUniformBuffers();
+        createDescriptorPool();
+        createDescriptorSets();
+        createCommandBuffers();
+
+        imagesInFlight.resize(swapChainImages.size(), VK_NULL_HANDLE);
+    }
+
+    void createInstance() {
+        if (enableValidationLayers && !checkValidationLayerSupport()) {
+            throw std::runtime_error("validation layers requested, but not available!");
+        }
+
+        VkApplicationInfo appInfo{};
+        appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+        appInfo.pApplicationName = "Program";
+        appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+        appInfo.pEngineName = "No Engine";
+        appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+        appInfo.apiVersion = VK_API_VERSION_1_0;
+
+        VkInstanceCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+        createInfo.pApplicationInfo = &appInfo;
+
+        auto extensions = getRequiredExtensions();
+        createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+        createInfo.ppEnabledExtensionNames = extensions.data();
+
+        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+        if (enableValidationLayers) {
+            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+            createInfo.ppEnabledLayerNames = validationLayers.data();
+
+            populateDebugMessengerCreateInfo(debugCreateInfo);
+            createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
+        }
+        else {
+            createInfo.enabledLayerCount = 0;
+
+            createInfo.pNext = nullptr;
+        }
+
+        if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create instance!");
+        }
+    }
+
+    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
+        createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        createInfo.pfnUserCallback = debugCallback;
+    }
+
+    void setupDebugMessenger() {
+        if (!enableValidationLayers) return;
+
+        VkDebugUtilsMessengerCreateInfoEXT createInfo;
+        populateDebugMessengerCreateInfo(createInfo);
+
+        if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
+            throw std::runtime_error("failed to set up debug messenger!");
+        }
+    }
+
+    void createSurface() {
+        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create window surface!");
+        }
+    }
+
+    void pickPhysicalDevice() {
+        uint32_t deviceCount = 0;
+        vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+
+        if (deviceCount == 0) {
+            throw std::runtime_error("failed to find GPUs with Vulkan support!");
+        }
+
+        std::vector<VkPhysicalDevice> devices(deviceCount);
+        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+
+        for (const auto& device : devices) {
+            if (isDeviceSuitable(device)) {
+                physicalDevice = device;
+                break;
+            }
+        }
+
+        if (physicalDevice == VK_NULL_HANDLE) {
+            throw std::runtime_error("failed to find a suitable GPU!");
+        }
+    }
+
+    void createLogicalDevice() {
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+        std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+
+        float queuePriority = 1.0f;
+        for (uint32_t queueFamily : uniqueQueueFamilies) {
+            VkDeviceQueueCreateInfo queueCreateInfo{};
+            queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queueCreateInfo.queueFamilyIndex = queueFamily;
+            queueCreateInfo.queueCount = 1;
+            queueCreateInfo.pQueuePriorities = &queuePriority;
+            queueCreateInfos.push_back(queueCreateInfo);
+        }
+
+        VkPhysicalDeviceFeatures deviceFeatures{};
+        deviceFeatures.samplerAnisotropy = VK_TRUE;
+
+        VkDeviceCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+        createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
+        createInfo.pQueueCreateInfos = queueCreateInfos.data();
+
+        createInfo.pEnabledFeatures = &deviceFeatures;
+
+        createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+        createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+
+        if (enableValidationLayers) {
+            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+            createInfo.ppEnabledLayerNames = validationLayers.data();
+        }
+        else {
+            createInfo.enabledLayerCount = 0;
+        }
+
+        if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create logical device!");
+        }
+
+        vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+        vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+    }
+
+    void createSwapChain() {
+        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
+
+        VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
+        VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+        VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+
+        uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+        if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
+            imageCount = swapChainSupport.capabilities.maxImageCount;
+        }
+
+        VkSwapchainCreateInfoKHR createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        createInfo.surface = surface;
+
+        createInfo.minImageCount = imageCount;
+        createInfo.imageFormat = surfaceFormat.format;
+        createInfo.imageColorSpace = surfaceFormat.colorSpace;
+        createInfo.imageExtent = extent;
+        createInfo.imageArrayLayers = 1;
+        createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+        uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+
+        if (indices.graphicsFamily != indices.presentFamily) {
+            createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+            createInfo.queueFamilyIndexCount = 2;
+            createInfo.pQueueFamilyIndices = queueFamilyIndices;
+        }
+        else {
+            createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        }
+
+        createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+        createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        createInfo.presentMode = presentMode;
+        createInfo.clipped = VK_TRUE;
+
+        if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create swap chain!");
+        }
+
+        vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+        swapChainImages.resize(imageCount);
+        vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
+
+        swapChainImageFormat = surfaceFormat.format;
+        swapChainExtent = extent;
+    }
+
+    void createImageViews() {
+        swapChainImageViews.resize(swapChainImages.size());
+
+        for (uint32_t i = 0; i < swapChainImages.size(); i++) {
+            swapChainImageViews[i] = createImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+        }
+    }
+
+    void createRenderPass() {
+        VkAttachmentDescription colorAttachment{};
+        colorAttachment.format = swapChainImageFormat;
+        colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        VkAttachmentDescription depthAttachment{};
+        depthAttachment.format = findDepthFormat();
+        depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference colorAttachmentRef{};
+        colorAttachmentRef.attachment = 0;
+        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference depthAttachmentRef{};
+        depthAttachmentRef.attachment = 1;
+        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription subpass{};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &colorAttachmentRef;
+        subpass.pDepthStencilAttachment = &depthAttachmentRef;
+
+        VkSubpassDependency dependency{};
+        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependency.dstSubpass = 0;
+        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dependency.srcAccessMask = 0;
+        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+        std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
+        VkRenderPassCreateInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        renderPassInfo.pAttachments = attachments.data();
+        renderPassInfo.subpassCount = 1;
+        renderPassInfo.pSubpasses = &subpass;
+        renderPassInfo.dependencyCount = 1;
+        renderPassInfo.pDependencies = &dependency;
+
+        if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create render pass!");
+        }
+    }
+
+    void createDescriptorSetLayout() {
+        VkDescriptorSetLayoutBinding uboLayoutBinding{};
+        uboLayoutBinding.binding = 0;
+        uboLayoutBinding.descriptorCount = 1;
+        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboLayoutBinding.pImmutableSamplers = nullptr;
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+        samplerLayoutBinding.binding = 1;
+        samplerLayoutBinding.descriptorCount = 1;
+        samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        samplerLayoutBinding.pImmutableSamplers = nullptr;
+        samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+        layoutInfo.pBindings = bindings.data();
+
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor set layout!");
+        }
+    }
+
+    void createGraphicsPipeline() {
+        auto vertShaderCode = readFile("shaders/vert.spv");
+        auto fragShaderCode = readFile("shaders/frag.spv");
+
+        VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+        VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+        VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
+        vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertShaderStageInfo.module = vertShaderModule;
+        vertShaderStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
+        fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragShaderStageInfo.module = fragShaderModule;
+        fragShaderStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+        auto bindingDescription = Vertex::getBindingDescription();
+        auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
+        vertexInputInfo.vertexBindingDescriptionCount = 1;
+        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+        vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+        vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = (float)swapChainExtent.width;
+        viewport.height = (float)swapChainExtent.height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+
+        VkRect2D scissor{};
+        scissor.offset = { 0, 0 };
+        scissor.extent = swapChainExtent;
+
+        VkPipelineViewportStateCreateInfo viewportState{};
+        viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportState.viewportCount = 1;
+        viewportState.pViewports = &viewport;
+        viewportState.scissorCount = 1;
+        viewportState.pScissors = &scissor;
+
+        VkPipelineRasterizationStateCreateInfo rasterizer{};
+        rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterizer.depthClampEnable = VK_FALSE;
+        rasterizer.rasterizerDiscardEnable = VK_FALSE;
+        rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterizer.lineWidth = 1.0f;
+        rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+        rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterizer.depthBiasEnable = VK_FALSE;
+
+        VkPipelineMultisampleStateCreateInfo multisampling{};
+        multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        multisampling.sampleShadingEnable = VK_FALSE;
+        multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        VkPipelineDepthStencilStateCreateInfo depthStencil{};
+        depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthStencil.depthTestEnable = VK_TRUE;
+        depthStencil.depthWriteEnable = VK_TRUE;
+        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+        depthStencil.depthBoundsTestEnable = VK_FALSE;
+        depthStencil.stencilTestEnable = VK_FALSE;
+
+        VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachment.blendEnable = VK_FALSE;
+
+        VkPipelineColorBlendStateCreateInfo colorBlending{};
+        colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        colorBlending.logicOpEnable = VK_FALSE;
+        colorBlending.logicOp = VK_LOGIC_OP_COPY;
+        colorBlending.attachmentCount = 1;
+        colorBlending.pAttachments = &colorBlendAttachment;
+        colorBlending.blendConstants[0] = 0.0f;
+        colorBlending.blendConstants[1] = 0.0f;
+        colorBlending.blendConstants[2] = 0.0f;
+        colorBlending.blendConstants[3] = 0.0f;
+
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+
+        if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create pipeline layout!");
+        }
+
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount = 2;
+        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssembly;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizer;
+        pipelineInfo.pMultisampleState = &multisampling;
+        pipelineInfo.pDepthStencilState = &depthStencil;
+        pipelineInfo.pColorBlendState = &colorBlending;
+        pipelineInfo.layout = pipelineLayout;
+        pipelineInfo.renderPass = renderPass;
+        pipelineInfo.subpass = 0;
+        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+        if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create graphics pipeline!");
+        }
+
+        vkDestroyShaderModule(device, fragShaderModule, nullptr);
+        vkDestroyShaderModule(device, vertShaderModule, nullptr);
+    }
+
+    void createFramebuffers() {
+        swapChainFramebuffers.resize(swapChainImageViews.size());
+
+        for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+            std::array<VkImageView, 2> attachments = {
+                swapChainImageViews[i],
+                depthImageView
+            };
+
+            VkFramebufferCreateInfo framebufferInfo{};
+            framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            framebufferInfo.renderPass = renderPass;
+            framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+            framebufferInfo.pAttachments = attachments.data();
+            framebufferInfo.width = swapChainExtent.width;
+            framebufferInfo.height = swapChainExtent.height;
+            framebufferInfo.layers = 1;
+
+            if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
+                throw std::runtime_error("failed to create framebuffer!");
+            }
+        }
+    }
+
+    void createCommandPool() {
+        QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice);
+
+        VkCommandPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+
+        if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create graphics command pool!");
+        }
+    }
+
+    void createDepthResources() {
+        VkFormat depthFormat = findDepthFormat();
+
+        createImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+        depthImageView = createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+    }
+
+    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
+        for (VkFormat format : candidates) {
+            VkFormatProperties props;
+            vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
+
+            if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
+                return format;
+            }
+            else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
+                return format;
+            }
+        }
+
+        throw std::runtime_error("failed to find supported format!");
+    }
+
+    VkFormat findDepthFormat() {
+        return findSupportedFormat(
+            { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+        );
+    }
+
+    bool hasStencilComponent(VkFormat format) {
+        return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+    }
+
+    void createTextureImage() {
+        int texWidth, texHeight, texChannels;
+        stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+        if (!pixels) {
+            throw std::runtime_error("failed to load texture image!");
+        }
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+        void* data;
+        vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
+        memcpy(data, pixels, static_cast<size_t>(imageSize));
+        vkUnmapMemory(device, stagingBufferMemory);
+
+        stbi_image_free(pixels);
+
+        createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
+
+        transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+        transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
+    }
+
+    void createTextureImageView() {
+        textureImageView = createImageView(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
+    }
+
+    void createTextureSampler() {
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+        VkSamplerCreateInfo samplerInfo{};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        samplerInfo.anisotropyEnable = VK_TRUE;
+        samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+        samplerInfo.compareEnable = VK_FALSE;
+        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+        if (vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create texture sampler!");
+        }
+    }
+
+    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) {
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = format;
+        viewInfo.subresourceRange.aspectMask = aspectFlags;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        VkImageView imageView;
+        if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create texture image view!");
+        }
+
+        return imageView;
+    }
+
+    void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent.width = width;
+        imageInfo.extent.height = height;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = format;
+        imageInfo.tiling = tiling;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = usage;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        if (vkCreateImage(device, &imageInfo, nullptr, &image) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create image!");
+        }
+
+        VkMemoryRequirements memRequirements;
+        vkGetImageMemoryRequirements(device, image, &memRequirements);
+
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+        if (vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate image memory!");
+        }
+
+        vkBindImageMemory(device, image, imageMemory, 0);
+    }
+
+    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout) {
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = oldLayout;
+        barrier.newLayout = newLayout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = image;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+
+        VkPipelineStageFlags sourceStage;
+        VkPipelineStageFlags destinationStage;
+
+        if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+            sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        }
+        else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+            sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        }
+        else {
+            throw std::invalid_argument("unsupported layout transition!");
+        }
+
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            sourceStage, destinationStage,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &barrier
+        );
+
+        endSingleTimeCommands(commandBuffer);
+    }
+
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+        VkBufferImageCopy region{};
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0;
+        region.bufferImageHeight = 0;
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = { 0, 0, 0 };
+        region.imageExtent = {
+            width,
+            height,
+            1
+        };
+
+        vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+        endSingleTimeCommands(commandBuffer);
+    }
+
+    void loadModel(Model &model, float offset_x, float offset_y, float offset_z) {
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string warn, err;
+
+        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, model.MODEL_PATH.c_str())) {
+            throw std::runtime_error(warn + err);
+        }
+
+        std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+
+        model.begin_vert = vertices.size();
+        model.begin_ind = indices.size();
+
+        for (const auto& shape : shapes) {
+            for (const auto& index : shape.mesh.indices) {
+                Vertex vertex{};
+
+                vertex.pos = {
+                    attrib.vertices[3 * index.vertex_index + 0] + offset_x,
+                    attrib.vertices[3 * index.vertex_index + 1] + offset_y,
+                    attrib.vertices[3 * index.vertex_index + 2] + offset_z
+                };
+
+                vertex.texCoord = {
+                    attrib.texcoords[2 * index.texcoord_index + 0],
+                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+                };
+
+                vertex.color = { 1.0f, 1.0f, 1.0f };
+                vertex.modelCenter = { offset_x, offset_y, offset_z };
+                vertex.rotationCount = 0;
+
+                if (uniqueVertices.count(vertex) == 0) {
+                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+                    vertices.push_back(vertex);
+                    model.size_vert++;
+                }
+
+                indices.push_back(uniqueVertices[vertex]);
+                model.size_ind++;
+            }
+        }
+    }
+
+    void generateWire(Model& model, float beginX, float beginY, float endX, float endY, float radius, bool signal) {
+        model.begin_vert = vertices.size();
+        model.size_vert = 8;
+        model.begin_ind = indices.size();
+        model.size_ind = 36;
+
+        int ind1[36] = { 
+            1,2,3,
+            2,4,3,
+            2,1,6,
+            6,1,5,
+            1,3,5,
+            5,3,7,
+            6,8,2,
+            2,8,4,
+            4,8,3,
+            8,7,3,
+            5,7,6,
+            6,7,8 };
+        int ind2[36] = {
+            2,1,3,
+            4,2,3,
+            1,2,6,
+            1,6,5,
+            3,1,5,
+            3,5,7,
+            8,6,2,
+            8,2,4,
+            8,4,3,
+            7,8,3,
+            7,5,6,
+            7,6,8 };
+        if ((beginX > endX) || (beginY < endY))
+        for (int i = 0; i < 36; i++) {
+            indices.push_back(ind1[i] - 1 + model.begin_vert);
+        }
+        else
+            for (int i = 0; i < 36; i++) {
+                indices.push_back(ind2[i] - 1 + model.begin_vert);
+            }
+
+        Vertex vertex = {};
+        vertex.color = { 1.0f, 1.0f, 1.0f };
+        vertex.modelCenter = { endX - beginX, endY - beginY, 0 };
+        vertex.rotationCount = 0;
+        if((beginX - endX < 0.01)&&(beginX - endX > -0.01)){
+            vertex.pos = { beginX + radius, beginY, radius };
+            if(!signal)
+                vertex.texCoord = { 0.5,0.1 };
+            else vertex.texCoord = { 0.6,0.8 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { beginX - radius, beginY, radius };
+            if (!signal)
+                vertex.texCoord = { 0.6,0.1 };
+            else vertex.texCoord = { 0.7,0.8 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { beginX + radius, beginY, -radius };
+            if (!signal)
+                vertex.texCoord = { 0.5,0.2 };
+            else vertex.texCoord = { 0.6,0.9 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { beginX - radius, beginY, -radius };
+            if (!signal)
+                vertex.texCoord = { 0.6,0.2 };
+            else vertex.texCoord = { 0.6,0.8 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { endX + radius, endY, radius };
+            if (!signal)
+                vertex.texCoord = { 0.5,0.1 };
+            else vertex.texCoord = { 0.6,0.8 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { endX - radius, endY, radius };
+            if (!signal)
+                vertex.texCoord = { 0.6,0.1 };
+            else vertex.texCoord = { 0.7,0.8 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { endX + radius, endY, -radius };
+            if (!signal)
+                vertex.texCoord = { 0.5,0.2 };
+            else vertex.texCoord = { 0.6,0.9 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { endX - radius, endY, -radius };
+            if (!signal)
+                vertex.texCoord = { 0.6,0.2 };
+            else vertex.texCoord = { 0.6,0.8 };
+
+            vertices.push_back(vertex);
+        }
+        else {
+            vertex.pos = { beginX , beginY + radius, radius };
+            if (!signal)
+                vertex.texCoord = { 0.5,0.1 };
+            else vertex.texCoord = { 0.6,0.8 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { beginX, beginY - radius, radius };
+            if (!signal)
+                vertex.texCoord = { 0.6,0.1 };
+            else vertex.texCoord = { 0.7,0.8 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { beginX, beginY + radius, -radius };
+            if (!signal)
+                vertex.texCoord = { 0.5,0.2 };
+            else vertex.texCoord = { 0.6,0.9 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { beginX , beginY - radius, -radius };
+            if (!signal)
+                vertex.texCoord = { 0.6,0.2 };
+            else vertex.texCoord = { 0.6,0.8 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { endX, endY + radius, radius };
+            if (!signal)
+                vertex.texCoord = { 0.5,0.1 };
+            else vertex.texCoord = { 0.6,0.8 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { endX, endY - radius, radius };
+            if (!signal)
+                vertex.texCoord = { 0.6,0.1 };
+            else vertex.texCoord = { 0.7,0.8 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { endX, endY + radius, -radius };
+            if (!signal)
+                vertex.texCoord = { 0.5,0.2 };
+            else vertex.texCoord = { 0.6,0.9 };
+
+            vertices.push_back(vertex);
+
+            vertex.pos = { endX, endY - radius, -radius };
+            if (!signal)
+                vertex.texCoord = { 0.6,0.2 };
+            else vertex.texCoord = { 0.6,0.8 };
+
+            vertices.push_back(vertex);
+        }
+        
+    }
+
+    void moveModel(Model& model, float offset_x, float offset_y, float offset_z) {
+        for (int i = model.begin_vert; i < model.begin_vert + model.size_vert; i++) {
+            vertices[i].pos.x += offset_x;
+            vertices[i].pos.y += offset_y;
+            vertices[i].pos.z += offset_z;
+            vertices[i].modelCenter.x += offset_x;
+            vertices[i].modelCenter.y += offset_y;
+            vertices[i].modelCenter.z += offset_z;
+
+        }
+    }
+
+    void moveHalfModel(Model& model, float offset_x, float offset_y, float offset_z, bool first) {
+        if (first) {
+            for (int i = model.begin_vert; i < model.begin_vert + (model.size_vert / 2); i++) {
+                vertices[i].pos.x += offset_x;
+                vertices[i].pos.y += offset_y;
+                vertices[i].pos.z += offset_z;
+            }
+        }else
+            for (int i = model.begin_vert + (model.size_vert / 2); i < model.begin_vert + model.size_vert; i++) {
+                vertices[i].pos.x += offset_x;
+                vertices[i].pos.y += offset_y;
+                vertices[i].pos.z += offset_z;
+            }
+    }
+
+    void rotateModel(Model& model, int rotationCount) {
+        for (int i = model.begin_vert; i < model.begin_vert + model.size_vert; i++) {
+            vertices[i].rotationCount = rotationCount;
+        }
+    }
+
+    void deleteModel(Model& model)//после удаления надо переопределить начала вершин и индексов во всех моделях (сами индексы тоже)
+    {
+        vertices.erase(vertices.begin() + model.begin_vert, vertices.begin() + model.begin_vert + model.size_vert);
+        indices.erase(indices.begin() + model.begin_ind, indices.begin() + model.begin_ind + model.size_ind);
+        for (int i = model.begin_ind; i < indices.size(); i++) {
+            indices[i] -= model.size_vert;
+        }
+        model.begin_ind = 0;
+        model.begin_vert = 0;
+        model.size_ind = 0;
+        model.size_vert = 0;
+    }
+
+    void createVertexBuffer() {
+        VkDeviceSize bufferSize = sizeof(Vertex) * 10000;
+        //VkDeviceSize bufferSize = 50000;
+
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+    }
+
+    void loadModelToBuffer(){
+        
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+        vkCmdFillBuffer(commandBuffer, vertexBuffer, 0, VK_WHOLE_SIZE, 0);
+
+        endSingleTimeCommands(commandBuffer);
+
+        commandBuffer = beginSingleTimeCommands();
+
+        vkCmdFillBuffer(commandBuffer, indexBuffer, 0, VK_WHOLE_SIZE, 0);
+
+        endSingleTimeCommands(commandBuffer);
+
+        if (vertices.size()) {
+
+            VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+            // load vertices to buffer
+            VkBuffer stagingBuffer;
+            VkDeviceMemory stagingBufferMemory;
+            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+            void* data;
+            vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+            memcpy(data, vertices.data(), (size_t)bufferSize);
+            vkUnmapMemory(device, stagingBufferMemory);
+
+            copyBuffer(stagingBuffer, vertexBuffer, bufferSize, 0);
+
+            vkDestroyBuffer(device, stagingBuffer, nullptr);
+            vkFreeMemory(device, stagingBufferMemory, nullptr);
+            // load indices to buffer
+            bufferSize = sizeof(indices[0]) * indices.size();
+            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+            vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+            memcpy(data, indices.data(), (size_t)bufferSize);
+            vkUnmapMemory(device, stagingBufferMemory);
+
+            copyBuffer(stagingBuffer, indexBuffer, bufferSize, 0);
+
+            vkDestroyBuffer(device, stagingBuffer, nullptr);
+            vkFreeMemory(device, stagingBufferMemory, nullptr);
+        }
+    }
+
+    void createIndexBuffer() {
+        VkDeviceSize bufferSize = sizeof(uint32_t) * 70000;
+        //VkDeviceSize bufferSize = 25000;
+
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+    }
+    
+    void createUniformBuffers() {
+        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+        uniformBuffers.resize(swapChainImages.size());
+        uniformBuffersMemory.resize(swapChainImages.size());
+
+        for (size_t i = 0; i < swapChainImages.size(); i++) {
+            createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+        }
+    }
+
+    void createDescriptorPool() {
+        std::array<VkDescriptorPoolSize, 2> poolSizes{};
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[0].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
+        poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[1].descriptorCount = static_cast<uint32_t>(swapChainImages.size());
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = static_cast<uint32_t>(swapChainImages.size());
+
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor pool!");
+        }
+    }
+
+    void createDescriptorSets() {
+        std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = descriptorPool;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
+        allocInfo.pSetLayouts = layouts.data();
+
+        descriptorSets.resize(swapChainImages.size());
+        if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate descriptor sets!");
+        }
+
+        for (size_t i = 0; i < swapChainImages.size(); i++) {
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = uniformBuffers[i];
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(UniformBufferObject);
+
+            VkDescriptorImageInfo imageInfo{};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = textureImageView;
+            imageInfo.sampler = textureSampler;
+
+            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = descriptorSets[i];
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].dstArrayElement = 0;
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].pBufferInfo = &bufferInfo;
+
+            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[1].dstSet = descriptorSets[i];
+            descriptorWrites[1].dstBinding = 1;
+            descriptorWrites[1].dstArrayElement = 0;
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[1].descriptorCount = 1;
+            descriptorWrites[1].pImageInfo = &imageInfo;
+
+            vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+        }
+    }
+
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = size;
+        bufferInfo.usage = usage;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create buffer!");
+        }
+
+        VkMemoryRequirements memRequirements;
+        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+        if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate buffer memory!");
+        }
+
+        vkBindBufferMemory(device, buffer, bufferMemory, 0);
+    }
+
+    VkCommandBuffer beginSingleTimeCommands() {
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandPool = commandPool;
+        allocInfo.commandBufferCount = 1;
+
+        VkCommandBuffer commandBuffer;
+        vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+        return commandBuffer;
+    }
+
+    void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+        vkEndCommandBuffer(commandBuffer);
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueWaitIdle(graphicsQueue);
+
+        vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+    }
+
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, int offset) {
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+        VkBufferCopy copyRegion{};
+        copyRegion.size = size;
+        copyRegion.dstOffset = offset;
+        vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+        endSingleTimeCommands(commandBuffer);
+    }
+
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+        VkPhysicalDeviceMemoryProperties memProperties;
+        vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+            if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+                return i;
+            }
+        }
+
+        throw std::runtime_error("failed to find suitable memory type!");
+    }
+
+    void createCommandBuffers() {
+        commandBuffers.resize(swapChainFramebuffers.size());
+
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = commandPool;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = (uint32_t)commandBuffers.size();
+
+        if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+            throw std::runtime_error("failed to allocate command buffers!");
+        }
+
+        for (size_t i = 0; i < commandBuffers.size(); i++) {
+            VkCommandBufferBeginInfo beginInfo{};
+            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+            if (vkBeginCommandBuffer(commandBuffers[i], &beginInfo) != VK_SUCCESS) {
+                throw std::runtime_error("failed to begin recording command buffer!");
+            }
+
+            VkRenderPassBeginInfo renderPassInfo{};
+            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            renderPassInfo.renderPass = renderPass;
+            renderPassInfo.framebuffer = swapChainFramebuffers[i];
+            renderPassInfo.renderArea.offset = { 0, 0 };
+            renderPassInfo.renderArea.extent = swapChainExtent;
+
+            std::array<VkClearValue, 2> clearValues{};
+            clearValues[0].color = { {0.1f, 0.1f, 0.1f, 1.0f} };
+            clearValues[1].depthStencil = { 1.0f, 0 };
+
+            renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+            renderPassInfo.pClearValues = clearValues.data();
+
+            vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+            vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+            VkBuffer vertexBuffers[] = { vertexBuffer };
+            VkDeviceSize offsets[] = { 0 };
+            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+
+            vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+            vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
+
+            vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(70000), 1, 0, 0, 0);
+
+            vkCmdEndRenderPass(commandBuffers[i]);
+
+            if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
+                throw std::runtime_error("failed to record command buffer!");
+            }
+        }
+    }
+
+    void createSyncObjects() {
+        imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+        imagesInFlight.resize(swapChainImages.size(), VK_NULL_HANDLE);
+
+        VkSemaphoreCreateInfo semaphoreInfo{};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+                vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+                vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+                throw std::runtime_error("failed to create synchronization objects for a frame!");
+            }
+        }
+    }
+
+    void updateUniformBuffer(uint32_t currentImage) {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        UniformBufferObject ubo{};
+         
+        ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.view = glm::lookAt(glm::vec3(camerax, cameray - 0.1, cameraz + 6), glm::vec3(camerax, cameray, cameraz), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.proj = glm::perspective(glm::radians(60.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 30.0f);
+        ubo.proj[1][1] *= -1;
+
+        void* data;
+        vkMapMemory(device, uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
+        memcpy(data, &ubo, sizeof(ubo));
+        vkUnmapMemory(device, uniformBuffersMemory[currentImage]);
+    }
+
+    void drawFrame() {
+        vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+
+        uint32_t imageIndex;
+        VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+        if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+            recreateSwapChain();
+            return;
+        }
+        else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+            throw std::runtime_error("failed to acquire swap chain image!");
+        }
+
+        updateUniformBuffer(imageIndex);
+
+        if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
+            vkWaitForFences(device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+        }
+        imagesInFlight[imageIndex] = inFlightFences[currentFrame];
+
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+        VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
+        VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = waitSemaphores;
+        submitInfo.pWaitDstStageMask = waitStages;
+
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
+
+        VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = signalSemaphores;
+
+        vkResetFences(device, 1, &inFlightFences[currentFrame]);
+
+        if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
+            throw std::runtime_error("failed to submit draw command buffer!");
+        }
+
+        VkPresentInfoKHR presentInfo{};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = signalSemaphores;
+
+        VkSwapchainKHR swapChains[] = { swapChain };
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = swapChains;
+
+        presentInfo.pImageIndices = &imageIndex;
+
+        result = vkQueuePresentKHR(presentQueue, &presentInfo);
+
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
+            framebufferResized = false;
+            recreateSwapChain();
+        }
+        else if (result != VK_SUCCESS) {
+            throw std::runtime_error("failed to present swap chain image!");
+        }
+
+        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    }
+
+    VkShaderModule createShaderModule(const std::vector<char>& code) {
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = code.size();
+        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+        VkShaderModule shaderModule;
+        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create shader module!");
+        }
+
+        return shaderModule;
+    }
+
+    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+        for (const auto& availableFormat : availableFormats) {
+            if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                return availableFormat;
+            }
+        }
+
+        return availableFormats[0];
+    }
+
+    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
+        for (const auto& availablePresentMode : availablePresentModes) {
+            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+                return availablePresentMode;
+            }
+        }
+
+        return VK_PRESENT_MODE_FIFO_KHR;
+    }
+
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+        if (capabilities.currentExtent.width != UINT32_MAX) {
+            return capabilities.currentExtent;
+        }
+        else {
+            int width, height;
+            glfwGetFramebufferSize(window, &width, &height);
+
+            VkExtent2D actualExtent = {
+                static_cast<uint32_t>(width),
+                static_cast<uint32_t>(height)
+            };
+
+            actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+            actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+
+            return actualExtent;
+        }
+    }
+
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
+        SwapChainSupportDetails details;
+
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
+
+        uint32_t formatCount;
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+
+        if (formatCount != 0) {
+            details.formats.resize(formatCount);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
+        }
+
+        uint32_t presentModeCount;
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+
+        if (presentModeCount != 0) {
+            details.presentModes.resize(presentModeCount);
+            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+        }
+
+        return details;
+    }
+
+    bool isDeviceSuitable(VkPhysicalDevice device) {
+        QueueFamilyIndices indices = findQueueFamilies(device);
+
+        bool extensionsSupported = checkDeviceExtensionSupport(device);
+
+        bool swapChainAdequate = false;
+        if (extensionsSupported) {
+            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
+            swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+        }
+
+        VkPhysicalDeviceFeatures supportedFeatures;
+        vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+
+        return indices.isComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
+    }
+
+    bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+        std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+
+        for (const auto& extension : availableExtensions) {
+            requiredExtensions.erase(extension.extensionName);
+        }
+
+        return requiredExtensions.empty();
+    }
+
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+        QueueFamilyIndices indices;
+
+        uint32_t queueFamilyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+        int i = 0;
+        for (const auto& queueFamily : queueFamilies) {
+            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                indices.graphicsFamily = i;
+            }
+
+            VkBool32 presentSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+
+            if (presentSupport) {
+                indices.presentFamily = i;
+            }
+
+            if (indices.isComplete()) {
+                break;
+            }
+
+            i++;
+        }
+
+        return indices;
+    }
+
+    std::vector<const char*> getRequiredExtensions() {
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions;
+        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+        std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
+        if (enableValidationLayers) {
+            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        }
+
+        return extensions;
+    }
+
+    bool checkValidationLayerSupport() {
+        uint32_t layerCount;
+        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+        std::vector<VkLayerProperties> availableLayers(layerCount);
+        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+        for (const char* layerName : validationLayers) {
+            bool layerFound = false;
+
+            for (const auto& layerProperties : availableLayers) {
+                if (strcmp(layerName, layerProperties.layerName) == 0) {
+                    layerFound = true;
+                    break;
+                }
+            }
+
+            if (!layerFound) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    static std::vector<char> readFile(const std::string& filename) {
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+        if (!file.is_open()) {
+            throw std::runtime_error("failed to open file!");
+        }
+
+        size_t fileSize = (size_t)file.tellg();
+        std::vector<char> buffer(fileSize);
+
+        file.seekg(0);
+        file.read(buffer.data(), fileSize);
+
+        file.close();
+
+        return buffer;
+    }
+
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
+        std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+
+        return VK_FALSE;
+    }
+};
+
+int main() {
+    Application app;
+
+    try {
+        app.run();
+ //       getchar();
+    }
+    catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
